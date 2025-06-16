@@ -21,7 +21,7 @@ getting and setting values, validating values, and enforcing mandatory keys.
 ## Installing
 
 ```bash
-  go get github.com/ChargePi/ocppManager-go@latest
+  go get github.com/ChargePi/ocpp-manager@latest
 ```
 
 ## ⚡ Usage
@@ -32,7 +32,7 @@ Check out the full [OCPP 1.6 example](examples/v16/example.go).
 package main
 
 import (
-	"github.com/ChargePi/ocppManager-go/ocpp_v16"
+	"github.com/ChargePi/ocpp-manager/ocpp_v16"
 	"github.com/lorenzodonini/ocpp-go/ocpp1.6/core"
 	"github.com/lorenzodonini/ocpp-go/ocpp1.6/smartcharging"
 	log "github.com/sirupsen/logrus"
