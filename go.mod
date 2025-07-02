@@ -10,6 +10,7 @@ require (
 	github.com/samber/lo v1.47.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.10.0
+	github.com/zyedidia/generic v1.2.1
 )
 
 require (
@@ -21,6 +22,8 @@ require (
 	github.com/leodido/go-urn v1.1.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/relvacode/iso8601 v1.6.0 // indirect
+	github.com/segmentio/fasthash v1.0.3 // indirect
+	golang.org/x/exp v0.0.0-20220218215828-6cf2b201936e // indirect
 	golang.org/x/sys v0.0.0-20220804214406-8e32c043e418 // indirect
 	golang.org/x/text v0.16.0 // indirect
 	gopkg.in/go-playground/validator.v9 v9.30.0 // indirect
