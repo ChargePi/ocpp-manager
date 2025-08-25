@@ -1,6 +1,9 @@
 package controllers
 
 import (
+	"fmt"
+	"sync"
+
 	"github.com/ChargePi/ocpp-manager/ocpp_v201/component"
 	"github.com/ChargePi/ocpp-manager/ocpp_v201/variables"
 )
@@ -45,65 +48,106 @@ func supportedVariablesISO15118Ctrlr() []variables.VariableName {
 }
 
 type ISO15118Ctrlr struct {
-	variables          map[variables.VariableName]variables.Variable
+	mu                 sync.RWMutex
+	variables          map[variables.VariableName]*variables.Variable
 	requiredVariables  []variables.VariableName
 	supportedVariables []variables.VariableName
+	instanceId         string
+	validator          *variableValidator
 }
 
 func (I *ISO15118Ctrlr) GetName() component.ComponentName {
-	//TODO implement me
-	panic("implement me")
+	return component.ComponentNameISO15118Ctrlr
 }
 
 func (I *ISO15118Ctrlr) GetInstanceId() string {
-	//TODO implement me
-	panic("implement me")
+	return I.instanceId
 }
 
 func (I *ISO15118Ctrlr) RegisterSubComponent(component component.Component) {
-	//TODO implement me
-	panic("implement me")
+	// No-op: controllers do not support sub-components
 }
 
 func (I *ISO15118Ctrlr) UnregisterSubComponent(component component.Component) {
-	//TODO implement me
-	panic("implement me")
+	// No-op: controllers do not support sub-components
 }
 
 func (I *ISO15118Ctrlr) GetSubComponents() []component.Component {
-	//TODO implement me
-	panic("implement me")
+	// Controllers do not support sub-components, always return empty slice
+	return []component.Component{}
 }
 
-func (I *ISO15118Ctrlr) GetRequiredVariables() []variables.Variable {
-	//TODO implement me
-	panic("implement me")
+func (I *ISO15118Ctrlr) GetRequiredVariables() []variables.VariableName {
+	I.mu.RLock()
+	defer I.mu.RUnlock()
+
+	return I.requiredVariables
 }
 
-func (I *ISO15118Ctrlr) GetSupportedVariables() []variables.Variable {
-	//TODO implement me
-	panic("implement me")
+func (I *ISO15118Ctrlr) GetSupportedVariables() []variables.VariableName {
+	I.mu.RLock()
+	defer I.mu.RUnlock()
+
+	return I.supportedVariables
 }
 
 func (I *ISO15118Ctrlr) GetVariable(key variables.VariableName, opts ...component.GetSetVariableOption) (*variables.Variable, error) {
-	//TODO implement me
-	panic("implement me")
+	if !I.validator.IsVariableSupported(key) {
+		return nil, fmt.Errorf("variable %s is not supported", key)
+	}
+
+	I.mu.RLock()
+	defer I.mu.RUnlock()
+
+	variable, exists := I.variables[key]
+	if !exists {
+		return nil, fmt.Errorf("variable %s not found", key)
+	}
+	return variable, nil
 }
 
 func (I *ISO15118Ctrlr) UpdateVariable(variable variables.VariableName, attribute string, value interface{}, opts ...component.GetSetVariableOption) error {
-	//TODO implement me
-	panic("implement me")
+	if !I.validator.IsVariableSupported(variable) {
+		return fmt.Errorf("variable %s is not supported", variable)
+	}
+
+	I.mu.Lock()
+	defer I.mu.Unlock()
+
+	v, exists := I.variables[variable]
+	if !exists {
+		return fmt.Errorf("variable %s not found", variable)
+	}
+
+	return v.UpdateVariableAttribute(attribute, value)
 }
 
 func (I *ISO15118Ctrlr) Validate(key variables.VariableName) bool {
-	//TODO implement me
-	panic("implement me")
+	if !I.validator.IsVariableSupported(key) {
+		return false
+	}
+
+	I.mu.RLock()
+	defer I.mu.RUnlock()
+
+	v, exists := I.variables[key]
+	if !exists {
+		return false
+	}
+
+	return v.Validate()
 }
 
 func NewISO15118Ctrlr() *ISO15118Ctrlr {
-	return &ISO15118Ctrlr{
-		variables:          map[variables.VariableName]variables.Variable{},
+	ctrlr := &ISO15118Ctrlr{
+		mu:                 sync.RWMutex{},
+		variables:          map[variables.VariableName]*variables.Variable{},
 		requiredVariables:  requiredVariablesISO15118Ctrlr(),
 		supportedVariables: supportedVariablesISO15118Ctrlr(),
+		instanceId:         "iso15118-ctrlr",
 	}
+
+	ctrlr.validator = newVariableValidator(ctrlr)
+
+	return ctrlr
 }

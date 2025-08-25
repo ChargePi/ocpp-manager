@@ -1,6 +1,9 @@
 package controllers
 
 import (
+	"fmt"
+	"sync"
+
 	"github.com/ChargePi/ocpp-manager/ocpp_v201/component"
 	"github.com/ChargePi/ocpp-manager/ocpp_v201/variables"
 )
@@ -34,65 +37,105 @@ func supportedAuthCacheVariables() []variables.VariableName {
 }
 
 type AuthCacheCtrlr struct {
-	variables          map[variables.VariableName]variables.Variable
+	mu                 sync.RWMutex
+	variables          map[variables.VariableName]*variables.Variable
 	supportedVariables []variables.VariableName
 	requiredVariables  []variables.VariableName
+	instanceId         string
+	validator          *variableValidator
 }
 
 func (a *AuthCacheCtrlr) GetName() component.ComponentName {
-	//TODO implement me
-	panic("implement me")
+	return component.ComponentNameAuthCacheCtrlr
 }
 
 func (a *AuthCacheCtrlr) GetInstanceId() string {
-	//TODO implement me
-	panic("implement me")
+	return a.instanceId
 }
 
 func (a *AuthCacheCtrlr) RegisterSubComponent(component component.Component) {
-	//TODO implement me
-	panic("implement me")
+	// No-op: controllers do not support sub-components
 }
 
 func (a *AuthCacheCtrlr) UnregisterSubComponent(component component.Component) {
-	//TODO implement me
-	panic("implement me")
+	// No-op: controllers do not support sub-components
 }
 
 func (a *AuthCacheCtrlr) GetSubComponents() []component.Component {
-	//TODO implement me
-	panic("implement me")
+	// Controllers do not support sub-components, always return empty slice
+	return []component.Component{}
 }
 
-func (a *AuthCacheCtrlr) GetRequiredVariables() []variables.Variable {
-	//TODO implement me
-	panic("implement me")
+func (a *AuthCacheCtrlr) GetRequiredVariables() []variables.VariableName {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+
+	return a.requiredVariables
 }
 
-func (a *AuthCacheCtrlr) GetSupportedVariables() []variables.Variable {
-	//TODO implement me
-	panic("implement me")
+func (a *AuthCacheCtrlr) GetSupportedVariables() []variables.VariableName {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+
+	return a.supportedVariables
 }
 
 func (a *AuthCacheCtrlr) GetVariable(key variables.VariableName, opts ...component.GetSetVariableOption) (*variables.Variable, error) {
-	//TODO implement me
-	panic("implement me")
+	if !a.validator.IsVariableSupported(key) {
+		return nil, fmt.Errorf("variable %s is not supported", key)
+	}
+
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+
+	variable, exists := a.variables[key]
+	if !exists {
+		return nil, fmt.Errorf("variable %s not found", key)
+	}
+	return variable, nil
 }
 
 func (a *AuthCacheCtrlr) UpdateVariable(variable variables.VariableName, attribute string, value interface{}, opts ...component.GetSetVariableOption) error {
-	//TODO implement me
-	panic("implement me")
+	if !a.validator.IsVariableSupported(variable) {
+		return fmt.Errorf("variable %s is not supported", variable)
+	}
+
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	v, exists := a.variables[variable]
+	if !exists {
+		return fmt.Errorf("variable %s not found", variable)
+	}
+
+	return v.UpdateVariableAttribute(attribute, value)
 }
 
 func (a *AuthCacheCtrlr) Validate(key variables.VariableName) bool {
-	//TODO implement me
-	panic("implement me")
+	if !a.validator.IsVariableSupported(key) {
+		return false
+	}
+
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+
+	v, exists := a.variables[key]
+	if !exists {
+		return false
+	}
+
+	return v.Validate()
 }
 
 func NewAuthCacheCtrlr() *AuthCacheCtrlr {
-	return &AuthCacheCtrlr{
-		variables:          make(map[variables.VariableName]variables.Variable),
+	ctrlr := &AuthCacheCtrlr{
+		mu:                 sync.RWMutex{},
+		variables:          make(map[variables.VariableName]*variables.Variable),
 		supportedVariables: supportedAuthCacheVariables(),
 		requiredVariables:  requiredAuthCacheVariables(),
+		instanceId:         "auth-cache-ctrlr",
 	}
+
+	ctrlr.validator = newVariableValidator(ctrlr)
+	return ctrlr
 }

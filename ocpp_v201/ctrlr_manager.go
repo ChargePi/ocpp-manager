@@ -25,41 +25,62 @@ func GetManager() *Manager {
 }
 
 type Manager struct {
-	controllers map[component.ComponentName]component.Component
+	components map[component.ComponentName]component.Component
 }
 
 type ManagerOption func(*managerOptions)
 
 type managerOptions struct {
-	// Supported profiles + controllers
+	// Supported profiles + components
+	components []component.Component
 }
 
-func NewManager() *Manager {
-	return &Manager{
-		controllers: map[component.ComponentName]component.Component{
-			component.ComponentNameMonitoringCtrlr:     controllers.NewMonitoringCtrlr(),
-			component.ComponentNameLocalAuthListCtrlr:  controllers.NewLocalAuthListCtrlr(),
-			component.ComponentNameReservationCtrlr:    controllers.NewReservationCtrlr(),
-			component.ComponentNameSmartChargingCtrlr:  controllers.NewSmartChargingCtrlr(),
-			component.ComponentNameTxCtrlr:             controllers.NewTxCtrlr(),
-			component.ComponentNameSecurityCtrlr:       controllers.NewSecurityCtrlr(),
-			component.ComponentNameClockCtrlr:          controllers.NewClockCtrlr(),
-			component.ComponentNameDeviceDataCtrlr:     controllers.NewDeviceDataCtrlr(),
-			component.ComponentNameAuthCtrlr:           controllers.NewAuthCtrlr(),
-			component.ComponentNameAuthCacheCtrlr:      controllers.NewAuthCacheCtrlr(),
-			component.ComponentNameISO15118Ctrlr:       controllers.NewISO15118Ctrlr(),
-			component.ComponentNameDisplayMessageCtrlr: controllers.NewDisplayCtrlr(),
-			component.ComponentNameOCPPCommCtrlr:       controllers.NewOCPPCommCtrlr(),
-			component.ComponentNameAlignedDataCtrlr:    controllers.NewAlignedDataCtrlr(),
-			component.ComponentNameSampledDataCtrlr:    controllers.NewSampledDataCtrlr(),
-			component.ComponentNameTariffCostCtrlr:     controllers.NewTariffCostCtrlr(),
-			component.ComponentNameCustomizationCtrlr:  controllers.NewCustomizationCtrlr(),
-		},
+func WithComponents(components []component.Component) ManagerOption {
+	return func(opts *managerOptions) {
+		opts.components = components
 	}
 }
 
+func NewManager(opts ...ManagerOption) *Manager {
+	manager := &Manager{
+		components: make(map[component.ComponentName]component.Component),
+	}
+
+	defaults := managerOptions{
+		components: []component.Component{
+			controllers.NewMonitoringCtrlr(),
+			controllers.NewLocalAuthListCtrlr(),
+			controllers.NewReservationCtrlr(),
+			controllers.NewSmartChargingCtrlr(),
+			controllers.NewTxCtrlr(),
+			controllers.NewSecurityCtrlr(),
+			controllers.NewClockCtrlr(),
+			controllers.NewDeviceDataCtrlr(),
+			controllers.NewAuthCtrlr(),
+			controllers.NewAuthCacheCtrlr(),
+			controllers.NewISO15118Ctrlr(),
+			controllers.NewDisplayCtrlr(),
+			controllers.NewOCPPCommCtrlr(),
+			controllers.NewAlignedDataCtrlr(),
+			controllers.NewSampledDataCtrlr(),
+			controllers.NewTariffCostCtrlr(),
+			controllers.NewCustomizationCtrlr(),
+		},
+	}
+	for _, opt := range opts {
+		opt(&defaults)
+	}
+
+	// Register components
+	for _, component := range defaults.components {
+		manager.components[component.GetName()] = component
+	}
+
+	return manager
+}
+
 func (m *Manager) UpdateVariable(name component.ComponentName, variableName variables.VariableName, attributeName string, attributeValue interface{}) error {
-	controller, ok := m.controllers[name]
+	controller, ok := m.components[name]
 	if !ok {
 		return errors.New("controller not found")
 	}
@@ -68,7 +89,7 @@ func (m *Manager) UpdateVariable(name component.ComponentName, variableName vari
 }
 
 func (m *Manager) GetVariable(name component.ComponentName, variableName variables.VariableName) (*variables.Variable, error) {
-	controller, ok := m.controllers[name]
+	controller, ok := m.components[name]
 	if !ok {
 		return nil, errors.New("controller not found")
 	}

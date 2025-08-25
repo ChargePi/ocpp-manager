@@ -1,6 +1,9 @@
 package controllers
 
 import (
+	"fmt"
+	"sync"
+
 	"github.com/ChargePi/ocpp-manager/ocpp_v201/component"
 	"github.com/ChargePi/ocpp-manager/ocpp_v201/variables"
 )
@@ -30,61 +33,146 @@ func supportedVariables() []variables.VariableName {
 }
 
 type DeviceDataCtrlr struct {
-	variables          map[variables.VariableName]variables.Variable
+	mu                 sync.RWMutex
+	variables          map[variables.VariableName]*variables.Variable
 	requiredVariables  []variables.VariableName
 	supportedVariables []variables.VariableName
+	instanceId         string
+	validator          *variableValidator
 }
 
 func (d *DeviceDataCtrlr) GetName() component.ComponentName {
-	//TODO implement me
-	panic("implement me")
+	return component.ComponentNameDeviceDataCtrlr
 }
 
 func (d *DeviceDataCtrlr) GetInstanceId() string {
-	//TODO implement me
-	panic("implement me")
+	return d.instanceId
 }
 
 func (d *DeviceDataCtrlr) RegisterSubComponent(component component.Component) {
-	//TODO implement me
-	panic("implement me")
+	// No-op: controllers do not support sub-components
 }
 
 func (d *DeviceDataCtrlr) UnregisterSubComponent(component component.Component) {
-	//TODO implement me
-	panic("implement me")
+	// No-op: controllers do not support sub-components
 }
 
 func (d *DeviceDataCtrlr) GetSubComponents() []component.Component {
-	//TODO implement me
-	panic("implement me")
+	// Controllers do not support sub-components, always return empty slice
+	return []component.Component{}
 }
 
-func (d *DeviceDataCtrlr) GetRequiredVariables() []variables.Variable {
-	//TODO implement me
-	panic("implement me")
+func (d *DeviceDataCtrlr) GetRequiredVariables() []variables.VariableName {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+
+	return d.requiredVariables
 }
 
-func (d *DeviceDataCtrlr) GetSupportedVariables() []variables.Variable {
-	//TODO implement me
-	panic("implement me")
+func (d *DeviceDataCtrlr) GetSupportedVariables() []variables.VariableName {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+
+	return d.supportedVariables
 }
 
 func (d *DeviceDataCtrlr) GetVariable(key variables.VariableName, opts ...component.GetSetVariableOption) (*variables.Variable, error) {
-	//TODO implement me
-	panic("implement me")
+	if !d.validator.IsVariableSupported(key) {
+		return nil, fmt.Errorf("variable %s is not supported", key)
+	}
+
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	variable, exists := d.variables[key]
+	if !exists {
+		return nil, fmt.Errorf("variable %s not found", key)
+	}
+	return variable, nil
 }
 
 func (d *DeviceDataCtrlr) UpdateVariable(variable variables.VariableName, attribute string, value interface{}, opts ...component.GetSetVariableOption) error {
-	//TODO implement me
-	panic("implement me")
+	if !d.validator.IsVariableSupported(variable) {
+		return fmt.Errorf("variable %s is not supported", variable)
+	}
+
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+
+	v, exists := d.variables[variable]
+	if !exists {
+		return fmt.Errorf("variable %s not found", variable)
+	}
+
+	return v.UpdateVariableAttribute(attribute, value)
 }
 
 func (d *DeviceDataCtrlr) Validate(key variables.VariableName) bool {
-	//TODO implement me
-	panic("implement me")
+	if !d.validator.IsVariableSupported(key) {
+		return false
+	}
+
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+
+	// Check if the variable exists
+	v, exists := d.variables[key]
+	if !exists {
+		return false
+	}
+
+	// Validate the variable itself
+	return v.Validate()
+}
+
+// ValidateAllRequiredVariables checks that all required variables are present and valid
+func (d *DeviceDataCtrlr) ValidateAllRequiredVariables() bool {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+
+	for _, requiredVar := range d.requiredVariables {
+		// Check if the variable exists
+		v, exists := d.variables[requiredVar]
+		if !exists {
+			return false
+		}
+		// Validate the variable itself
+		if !v.Validate() {
+			return false
+		}
+	}
+
+	return true
 }
 
 func NewDeviceDataCtrlr() *DeviceDataCtrlr {
-	return &DeviceDataCtrlr{}
+	ctrlr := &DeviceDataCtrlr{
+		mu:                 sync.RWMutex{},
+		variables:          make(map[variables.VariableName]*variables.Variable),
+		requiredVariables:  requiredVariables(),
+		supportedVariables: supportedVariables(),
+		instanceId:         "device-data-ctrlr",
+	}
+
+	ctrlr.validator = newVariableValidator(ctrlr)
+
+	// Initialize all required variables with default values
+	ctrlr.variables[VariableNameBytesPerMessage] = variables.NewVariable(
+		VariableNameBytesPerMessage,
+		variables.VariableTypeInteger,
+	)
+	ctrlr.variables[VariableNameConfigurationValueSize] = variables.NewVariable(
+		VariableNameConfigurationValueSize,
+		variables.VariableTypeInteger,
+	)
+	ctrlr.variables[VariableNameReportingValueSize] = variables.NewVariable(
+		VariableNameReportingValueSize,
+		variables.VariableTypeInteger,
+	)
+	ctrlr.variables[VariableNameItemsPerMessage] = variables.NewVariable(
+		VariableNameItemsPerMessage,
+		variables.VariableTypeInteger,
+	)
+
+	return ctrlr
 }

@@ -3,24 +3,35 @@ package component
 import "github.com/ChargePi/ocpp-manager/ocpp_v201/variables"
 
 type Component interface {
-	// Essentially a component type.
+
+	// GetName Essentially a component type.
 	GetName() ComponentName
-	// Instance ID where a component can be addressed
+
+	// GetInstanceId returns the unique instance ID of this component.
 	GetInstanceId() string
+
 	// RegisterSubComponent registers a sub-component to this component.
 	RegisterSubComponent(component Component)
+
 	// UnregisterSubComponent unregisters a sub-component from this component.
 	UnregisterSubComponent(component Component)
+
 	// GetSubComponents returns all sub-components of this component.
 	GetSubComponents() []Component
 
-	// Required variables for this component
-	GetRequiredVariables() []variables.Variable
-	// Suported variables for this component
-	GetSupportedVariables() []variables.Variable
+	// GetRequiredVariables returns required variables for this component
+	GetRequiredVariables() []variables.VariableName
 
+	// GetSupportedVariables returns supported variables (both required and optional) for this component
+	GetSupportedVariables() []variables.VariableName
+
+	// GetVariable retrieves a variable by its name.
 	GetVariable(key variables.VariableName, opts ...GetSetVariableOption) (*variables.Variable, error)
+
+	// UpdateVariable updates a variable's attribute with a new value.
 	UpdateVariable(variable variables.VariableName, attribute string, value interface{}, opts ...GetSetVariableOption) error
+
+	// Validate checks if the variable is valid for this component.
 	Validate(key variables.VariableName) bool
 }
 
