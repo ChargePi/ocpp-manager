@@ -1,6 +1,9 @@
 package controllers
 
 import (
+	"fmt"
+	"sync"
+
 	"github.com/ChargePi/ocpp-manager/ocpp_v201/component"
 	"github.com/ChargePi/ocpp-manager/ocpp_v201/variables"
 )
@@ -36,65 +39,106 @@ func supportedLocalAuthListVariables() []variables.VariableName {
 }
 
 type LocalAuthListCtrlr struct {
-	variables          map[variables.VariableName]variables.Variable
+	mu                 sync.RWMutex
+	variables          map[variables.VariableName]*variables.Variable
 	requiredVariables  []variables.VariableName
 	supportedVariables []variables.VariableName
+	instanceId         string
+	validator          *variableValidator
 }
 
-func (l *LocalAuthListCtrlr) GetName() component.ComponentName {
-	//TODO implement me
-	panic("implement me")
+func (l *LocalAuthListCtrlr) GetName() component.Name {
+	return component.ComponentNameLocalAuthListCtrlr
 }
 
 func (l *LocalAuthListCtrlr) GetInstanceId() string {
-	//TODO implement me
-	panic("implement me")
+	return l.instanceId
 }
 
 func (l *LocalAuthListCtrlr) RegisterSubComponent(component component.Component) {
-	//TODO implement me
-	panic("implement me")
+	// No-op: controllers do not support sub-components
 }
 
 func (l *LocalAuthListCtrlr) UnregisterSubComponent(component component.Component) {
-	//TODO implement me
-	panic("implement me")
+	// No-op: controllers do not support sub-components
 }
 
 func (l *LocalAuthListCtrlr) GetSubComponents() []component.Component {
-	//TODO implement me
-	panic("implement me")
+	// Controllers do not support sub-components, always return empty slice
+	return []component.Component{}
 }
 
-func (l *LocalAuthListCtrlr) GetRequiredVariables() []variables.Variable {
-	//TODO implement me
-	panic("implement me")
+func (l *LocalAuthListCtrlr) GetRequiredVariables() []variables.VariableName {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+
+	return l.requiredVariables
 }
 
-func (l *LocalAuthListCtrlr) GetSupportedVariables() []variables.Variable {
-	//TODO implement me
-	panic("implement me")
+func (l *LocalAuthListCtrlr) GetSupportedVariables() []variables.VariableName {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+
+	return l.supportedVariables
 }
 
 func (l *LocalAuthListCtrlr) GetVariable(key variables.VariableName, opts ...component.GetSetVariableOption) (*variables.Variable, error) {
-	//TODO implement me
-	panic("implement me")
+	if !l.validator.IsVariableSupported(key) {
+		return nil, fmt.Errorf("variable %s is not supported", key)
+	}
+
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+
+	variable, exists := l.variables[key]
+	if !exists {
+		return nil, fmt.Errorf("variable %s not found", key)
+	}
+	return variable, nil
 }
 
 func (l *LocalAuthListCtrlr) UpdateVariable(variable variables.VariableName, attribute string, value interface{}, opts ...component.GetSetVariableOption) error {
-	//TODO implement me
-	panic("implement me")
+	if !l.validator.IsVariableSupported(variable) {
+		return fmt.Errorf("variable %s is not supported", variable)
+	}
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	v, exists := l.variables[variable]
+	if !exists {
+		return fmt.Errorf("variable %s not found", variable)
+	}
+
+	return v.UpdateVariableAttribute(attribute, value)
 }
 
 func (l *LocalAuthListCtrlr) Validate(key variables.VariableName) bool {
-	//TODO implement me
-	panic("implement me")
+	if !l.validator.IsVariableSupported(key) {
+		return false
+	}
+
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+
+	v, exists := l.variables[key]
+	if !exists {
+		return false
+	}
+
+	return v.Validate()
 }
 
 func NewLocalAuthListCtrlr() *LocalAuthListCtrlr {
-	return &LocalAuthListCtrlr{
-		variables:          make(map[variables.VariableName]variables.Variable),
+	ctrlr := &LocalAuthListCtrlr{
+		mu:                 sync.RWMutex{},
+		variables:          make(map[variables.VariableName]*variables.Variable),
 		requiredVariables:  requiredLocalAuthListVariables(),
 		supportedVariables: supportedLocalAuthListVariables(),
+		instanceId:         "local-auth-list-ctrlr",
 	}
+
+	ctrlr.validator = newVariableValidator(ctrlr)
+
+	return ctrlr
 }

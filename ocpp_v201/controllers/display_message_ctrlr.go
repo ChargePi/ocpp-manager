@@ -1,6 +1,9 @@
 package controllers
 
 import (
+	"fmt"
+	"sync"
+
 	"github.com/ChargePi/ocpp-manager/ocpp_v201/component"
 	"github.com/ChargePi/ocpp-manager/ocpp_v201/variables"
 )
@@ -33,65 +36,107 @@ func supportedDisplayMessageVariables() []variables.VariableName {
 }
 
 type DisplayCtrlr struct {
-	variables          map[variables.VariableName]variables.Variable
+	mu                 sync.RWMutex
+	variables          map[variables.VariableName]*variables.Variable
 	requiredVariables  []variables.VariableName
 	supportedVariables []variables.VariableName
+	instanceId         string
+	validator          *variableValidator
 }
 
-func (d *DisplayCtrlr) GetName() component.ComponentName {
-	//TODO implement me
-	panic("implement me")
+func (d *DisplayCtrlr) GetName() component.Name {
+	return component.ComponentNameDisplayMessageCtrlr
 }
 
 func (d *DisplayCtrlr) GetInstanceId() string {
-	//TODO implement me
-	panic("implement me")
+	return d.instanceId
 }
 
 func (d *DisplayCtrlr) RegisterSubComponent(component component.Component) {
-	//TODO implement me
-	panic("implement me")
+	// No-op: controllers do not support sub-components
 }
 
 func (d *DisplayCtrlr) UnregisterSubComponent(component component.Component) {
-	//TODO implement me
-	panic("implement me")
+	// No-op: controllers do not support sub-components
 }
 
 func (d *DisplayCtrlr) GetSubComponents() []component.Component {
-	//TODO implement me
-	panic("implement me")
+	// Controllers do not support sub-components, always return empty slice
+	return []component.Component{}
 }
 
-func (d *DisplayCtrlr) GetRequiredVariables() []variables.Variable {
-	//TODO implement me
-	panic("implement me")
+func (d *DisplayCtrlr) GetRequiredVariables() []variables.VariableName {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+
+	return d.requiredVariables
 }
 
-func (d *DisplayCtrlr) GetSupportedVariables() []variables.Variable {
-	//TODO implement me
-	panic("implement me")
+func (d *DisplayCtrlr) GetSupportedVariables() []variables.VariableName {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+
+	return d.supportedVariables
 }
 
 func (d *DisplayCtrlr) GetVariable(key variables.VariableName, opts ...component.GetSetVariableOption) (*variables.Variable, error) {
-	//TODO implement me
-	panic("implement me")
+	if !d.validator.IsVariableSupported(key) {
+		return nil, fmt.Errorf("variable %s is not supported", key)
+	}
+
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+
+	variable, exists := d.variables[key]
+	if !exists {
+		return nil, fmt.Errorf("variable %s not found", key)
+	}
+
+	return variable, nil
 }
 
 func (d *DisplayCtrlr) UpdateVariable(variable variables.VariableName, attribute string, value interface{}, opts ...component.GetSetVariableOption) error {
-	//TODO implement me
-	panic("implement me")
+	if !d.validator.IsVariableSupported(variable) {
+		return fmt.Errorf("variable %s is not supported", variable)
+	}
+
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	v, exists := d.variables[variable]
+	if !exists {
+		return fmt.Errorf("variable %s not found", variable)
+	}
+
+	return v.UpdateVariableAttribute(attribute, value)
 }
 
 func (d *DisplayCtrlr) Validate(key variables.VariableName) bool {
-	//TODO implement me
-	panic("implement me")
+	if !d.validator.IsVariableSupported(key) {
+		return false
+	}
+
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+
+	v, exists := d.variables[key]
+	if !exists {
+		return false
+	}
+
+	return v.Validate()
 }
 
 func NewDisplayCtrlr() *DisplayCtrlr {
-	return &DisplayCtrlr{
-		variables:          make(map[variables.VariableName]variables.Variable),
+	ctrlr := &DisplayCtrlr{
+		mu:                 sync.RWMutex{},
+		variables:          make(map[variables.VariableName]*variables.Variable),
 		requiredVariables:  requiredDisplayMessageVariables(),
 		supportedVariables: supportedDisplayMessageVariables(),
+		instanceId:         "display-message-ctrlr",
 	}
+
+	ctrlr.validator = newVariableValidator(ctrlr)
+
+	return ctrlr
 }

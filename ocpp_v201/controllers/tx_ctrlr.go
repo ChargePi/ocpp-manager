@@ -1,6 +1,9 @@
 package controllers
 
 import (
+	"fmt"
+	"sync"
+
 	"github.com/ChargePi/ocpp-manager/ocpp_v201/component"
 	"github.com/ChargePi/ocpp-manager/ocpp_v201/variables"
 )
@@ -17,9 +20,6 @@ const (
 
 func requiredTxCtrlrVariables() []variables.VariableName {
 	return []variables.VariableName{
-		VariableNameEVConnectionTimeOut,
-		VariableNameStopTxOnEVSideDisconnect,
-		VariableNameStopTxOnInvalidId,
 		VariableNameTxStartPoint,
 		VariableNameTxStopPoint,
 	}
@@ -37,65 +37,102 @@ func supportedTxCtrlrVariables() []variables.VariableName {
 }
 
 type TxCtrlr struct {
-	variables          map[variables.VariableName]variables.Variable
+	mu                 sync.RWMutex
+	variables          map[variables.VariableName]*variables.Variable
 	requiredVariables  []variables.VariableName
 	supportedVariables []variables.VariableName
+	validator          *variableValidator
+	instanceId         string
 }
 
-func (t *TxCtrlr) GetName() component.ComponentName {
-	//TODO implement me
-	panic("implement me")
+func (t *TxCtrlr) GetName() component.Name {
+	return component.ComponentNameTxCtrlr
 }
 
 func (t *TxCtrlr) GetInstanceId() string {
-	//TODO implement me
-	panic("implement me")
+	return t.instanceId
 }
 
 func (t *TxCtrlr) RegisterSubComponent(component component.Component) {
-	//TODO implement me
-	panic("implement me")
+	// No-op: controllers do not support sub-components
 }
 
 func (t *TxCtrlr) UnregisterSubComponent(component component.Component) {
-	//TODO implement me
-	panic("implement me")
+	// No-op: controllers do not support sub-components
 }
 
 func (t *TxCtrlr) GetSubComponents() []component.Component {
-	//TODO implement me
-	panic("implement me")
+	return []component.Component{}
 }
 
-func (t *TxCtrlr) GetRequiredVariables() []variables.Variable {
-	//TODO implement me
-	panic("implement me")
+func (t *TxCtrlr) GetRequiredVariables() []variables.VariableName {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	return t.requiredVariables
 }
 
-func (t *TxCtrlr) GetSupportedVariables() []variables.Variable {
-	//TODO implement me
-	panic("implement me")
+func (t *TxCtrlr) GetSupportedVariables() []variables.VariableName {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	return t.supportedVariables
 }
 
 func (t *TxCtrlr) GetVariable(key variables.VariableName, opts ...component.GetSetVariableOption) (*variables.Variable, error) {
-	//TODO implement me
-	panic("implement me")
+	if !t.validator.IsVariableSupported(key) {
+		return nil, fmt.Errorf("variable %s is not supported by this controller", key)
+	}
+
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	variable, exists := t.variables[key]
+	if !exists {
+		return nil, fmt.Errorf("variable %s not found", key)
+	}
+	return variable, nil
 }
 
 func (t *TxCtrlr) UpdateVariable(variable variables.VariableName, attribute string, value interface{}, opts ...component.GetSetVariableOption) error {
-	//TODO implement me
-	panic("implement me")
+	if !t.validator.IsVariableSupported(variable) {
+		return fmt.Errorf("variable %s is not supported by this controller", variable)
+	}
+
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	v, exists := t.variables[variable]
+	if !exists {
+		return fmt.Errorf("variable %s not found", variable)
+	}
+
+	return v.UpdateVariableAttribute(attribute, value)
 }
 
 func (t *TxCtrlr) Validate(key variables.VariableName) bool {
-	//TODO implement me
-	panic("implement me")
+
+	if !t.validator.IsVariableSupported(key) {
+		return false
+	}
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	v, exists := t.variables[key]
+	if !exists {
+		return false
+	}
+
+	return v.Validate()
 }
 
 func NewTxCtrlr() *TxCtrlr {
-	return &TxCtrlr{
-		variables:          make(map[variables.VariableName]variables.Variable),
+	ctrlr := &TxCtrlr{
+		variables:          make(map[variables.VariableName]*variables.Variable),
 		requiredVariables:  requiredTxCtrlrVariables(),
 		supportedVariables: supportedTxCtrlrVariables(),
+		instanceId:         "tx-ctrlr",
 	}
+	ctrlr.validator = newVariableValidator(ctrlr)
+	return ctrlr
 }

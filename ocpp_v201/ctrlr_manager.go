@@ -24,42 +24,56 @@ func GetManager() *Manager {
 	return managerInstance
 }
 
+func RegisterComponent(component component.Component) error {
+	return managerInstance.RegisterComponent(component)
+}
+
 type Manager struct {
-	controllers map[component.ComponentName]component.Component
+	// Set of registered components
+	components map[component.Name]component.Component
 }
 
-type ManagerOption func(*managerOptions)
+func NewManager(opts ...ManagerOption) *Manager {
+	manager := &Manager{
+		components: make(map[component.Name]component.Component),
+	}
 
-type managerOptions struct {
-	// Supported profiles + controllers
-}
-
-func NewManager() *Manager {
-	return &Manager{
-		controllers: map[component.ComponentName]component.Component{
-			component.ComponentNameMonitoringCtrlr:     controllers.NewMonitoringCtrlr(),
-			component.ComponentNameLocalAuthListCtrlr:  controllers.NewLocalAuthListCtrlr(),
-			component.ComponentNameReservationCtrlr:    controllers.NewReservationCtrlr(),
-			component.ComponentNameSmartChargingCtrlr:  controllers.NewSmartChargingCtrlr(),
-			component.ComponentNameTxCtrlr:             controllers.NewTxCtrlr(),
-			component.ComponentNameSecurityCtrlr:       controllers.NewSecurityCtrlr(),
-			component.ComponentNameClockCtrlr:          controllers.NewClockCtrlr(),
-			component.ComponentNameDeviceDataCtrlr:     controllers.NewDeviceDataCtrlr(),
-			component.ComponentNameAuthCtrlr:           controllers.NewAuthCtrlr(),
-			component.ComponentNameAuthCacheCtrlr:      controllers.NewAuthCacheCtrlr(),
-			component.ComponentNameISO15118Ctrlr:       controllers.NewISO15118Ctrlr(),
-			component.ComponentNameDisplayMessageCtrlr: controllers.NewDisplayCtrlr(),
-			component.ComponentNameOCPPCommCtrlr:       controllers.NewOCPPCommCtrlr(),
-			component.ComponentNameAlignedDataCtrlr:    controllers.NewAlignedDataCtrlr(),
-			component.ComponentNameSampledDataCtrlr:    controllers.NewSampledDataCtrlr(),
-			component.ComponentNameTariffCostCtrlr:     controllers.NewTariffCostCtrlr(),
-			component.ComponentNameCustomizationCtrlr:  controllers.NewCustomizationCtrlr(),
+	defaults := managerOptions{
+		// By default, instantiate all controllers
+		components: []component.Component{
+			controllers.NewMonitoringCtrlr(),
+			controllers.NewLocalAuthListCtrlr(),
+			controllers.NewReservationCtrlr(),
+			controllers.NewSmartChargingCtrlr(),
+			controllers.NewTxCtrlr(),
+			controllers.NewSecurityCtrlr(),
+			controllers.NewClockCtrlr(),
+			controllers.NewDeviceDataCtrlr(),
+			controllers.NewAuthCtrlr(),
+			controllers.NewAuthCacheCtrlr(),
+			controllers.NewISO15118Ctrlr(),
+			controllers.NewDisplayCtrlr(),
+			controllers.NewOCPPCommCtrlr(),
+			controllers.NewAlignedDataCtrlr(),
+			controllers.NewSampledDataCtrlr(),
+			controllers.NewTariffCostCtrlr(),
+			controllers.NewCustomizationCtrlr(),
 		},
 	}
+	for _, opt := range opts {
+		opt(&defaults)
+	}
+
+	// Register components
+	for _, c := range defaults.components {
+		manager.components[c.GetName()] = c
+	}
+
+	return manager
 }
 
-func (m *Manager) UpdateVariable(name component.ComponentName, variableName variables.VariableName, attributeName string, attributeValue interface{}) error {
-	controller, ok := m.controllers[name]
+func (m *Manager) UpdateVariable(name component.Name, variableName variables.VariableName, attributeName string, attributeValue interface{}) error {
+	controller, ok := m.components[name]
 	if !ok {
 		return errors.New("controller not found")
 	}
@@ -67,11 +81,20 @@ func (m *Manager) UpdateVariable(name component.ComponentName, variableName vari
 	return controller.UpdateVariable(variableName, attributeName, attributeValue)
 }
 
-func (m *Manager) GetVariable(name component.ComponentName, variableName variables.VariableName) (*variables.Variable, error) {
-	controller, ok := m.controllers[name]
+func (m *Manager) GetVariable(name component.Name, variableName variables.VariableName) (*variables.Variable, error) {
+	controller, ok := m.components[name]
 	if !ok {
 		return nil, errors.New("controller not found")
 	}
 
 	return controller.GetVariable(variableName)
+}
+
+func (m *Manager) RegisterComponent(component component.Component) error {
+	if _, found := m.components[component.GetName()]; !found {
+		m.components[component.GetName()] = component
+		return nil
+	}
+
+	return errors.New("component already registered")
 }

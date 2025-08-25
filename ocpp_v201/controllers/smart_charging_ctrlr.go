@@ -1,6 +1,9 @@
 package controllers
 
 import (
+	"fmt"
+	"sync"
+
 	"github.com/ChargePi/ocpp-manager/ocpp_v201/component"
 	"github.com/ChargePi/ocpp-manager/ocpp_v201/variables"
 )
@@ -45,65 +48,107 @@ func supportedSmartChargingVariables() []variables.VariableName {
 }
 
 type SmartChargingCtrlr struct {
-	variables          map[variables.VariableName]variables.Variable
+	mu                 sync.RWMutex
+	variables          map[variables.VariableName]*variables.Variable
 	requiredVariables  []variables.VariableName
 	supportedVariables []variables.VariableName
+	instanceId         string
+	validator          *variableValidator
 }
 
-func (s *SmartChargingCtrlr) GetName() component.ComponentName {
-	//TODO implement me
-	panic("implement me")
+func (s *SmartChargingCtrlr) GetName() component.Name {
+	return component.ComponentNameSmartChargingCtrlr
 }
 
 func (s *SmartChargingCtrlr) GetInstanceId() string {
-	//TODO implement me
-	panic("implement me")
+	return s.instanceId
 }
 
 func (s *SmartChargingCtrlr) RegisterSubComponent(component component.Component) {
-	//TODO implement me
-	panic("implement me")
+	// No-op: controllers do not support sub-components
 }
 
 func (s *SmartChargingCtrlr) UnregisterSubComponent(component component.Component) {
-	//TODO implement me
-	panic("implement me")
+	// No-op: controllers do not support sub-components
 }
 
 func (s *SmartChargingCtrlr) GetSubComponents() []component.Component {
-	//TODO implement me
-	panic("implement me")
+	// Controllers do not support sub-components, always return empty slice
+	return []component.Component{}
 }
 
-func (s *SmartChargingCtrlr) GetRequiredVariables() []variables.Variable {
-	//TODO implement me
-	panic("implement me")
+func (s *SmartChargingCtrlr) GetRequiredVariables() []variables.VariableName {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.requiredVariables
 }
 
-func (s *SmartChargingCtrlr) GetSupportedVariables() []variables.Variable {
-	//TODO implement me
-	panic("implement me")
+func (s *SmartChargingCtrlr) GetSupportedVariables() []variables.VariableName {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.supportedVariables
 }
 
 func (s *SmartChargingCtrlr) GetVariable(key variables.VariableName, opts ...component.GetSetVariableOption) (*variables.Variable, error) {
-	//TODO implement me
-	panic("implement me")
+	if !s.validator.IsVariableSupported(key) {
+		return nil, fmt.Errorf("variable %s is not supported", key)
+	}
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	variable, exists := s.variables[key]
+	if !exists {
+		return nil, fmt.Errorf("variable %s not found", key)
+	}
+
+	return variable, nil
 }
 
 func (s *SmartChargingCtrlr) UpdateVariable(variable variables.VariableName, attribute string, value interface{}, opts ...component.GetSetVariableOption) error {
-	//TODO implement me
-	panic("implement me")
+	if !s.validator.IsVariableSupported(variable) {
+		return fmt.Errorf("variable %s is not supported", variable)
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	v, exists := s.variables[variable]
+	if !exists {
+		return fmt.Errorf("variable %s not found", variable)
+	}
+
+	return v.UpdateVariableAttribute(attribute, value)
 }
 
 func (s *SmartChargingCtrlr) Validate(key variables.VariableName) bool {
-	//TODO implement me
-	panic("implement me")
+	if !s.validator.IsVariableSupported(key) {
+		return false
+	}
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	v, exists := s.variables[key]
+	if !exists {
+		return false
+	}
+
+	return v.Validate()
 }
 
 func NewSmartChargingCtrlr() *SmartChargingCtrlr {
-	return &SmartChargingCtrlr{
-		variables:          make(map[variables.VariableName]variables.Variable),
+	ctrlr := &SmartChargingCtrlr{
+		mu:                 sync.RWMutex{},
+		variables:          make(map[variables.VariableName]*variables.Variable),
 		requiredVariables:  requiredSmartChargingVariables(),
 		supportedVariables: supportedSmartChargingVariables(),
+		instanceId:         "smart-charging-ctrlr",
 	}
+
+	ctrlr.validator = newVariableValidator(ctrlr)
+
+	return ctrlr
 }

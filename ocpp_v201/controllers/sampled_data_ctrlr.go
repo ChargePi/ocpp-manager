@@ -1,6 +1,9 @@
 package controllers
 
 import (
+	"fmt"
+	"sync"
+
 	"github.com/ChargePi/ocpp-manager/ocpp_v201/component"
 	"github.com/ChargePi/ocpp-manager/ocpp_v201/variables"
 )
@@ -41,65 +44,107 @@ func supportedSampledDataVariables() []variables.VariableName {
 }
 
 type SampledDataCtrlr struct {
-	variables          map[variables.VariableName]variables.Variable
+	mu                 sync.RWMutex
+	variables          map[variables.VariableName]*variables.Variable
 	requiredVariables  []variables.VariableName
 	supportedVariables []variables.VariableName
+	instanceId         string
+	validator          *variableValidator
 }
 
-func (s *SampledDataCtrlr) GetName() component.ComponentName {
-	//TODO implement me
-	panic("implement me")
+func (s *SampledDataCtrlr) GetName() component.Name {
+	return component.ComponentNameSampledDataCtrlr
 }
 
 func (s *SampledDataCtrlr) GetInstanceId() string {
-	//TODO implement me
-	panic("implement me")
+	return s.instanceId
 }
 
 func (s *SampledDataCtrlr) RegisterSubComponent(component component.Component) {
-	//TODO implement me
-	panic("implement me")
+	// No-op: controllers do not support sub-components
 }
 
 func (s *SampledDataCtrlr) UnregisterSubComponent(component component.Component) {
-	//TODO implement me
-	panic("implement me")
+	// No-op: controllers do not support sub-components
 }
 
 func (s *SampledDataCtrlr) GetSubComponents() []component.Component {
-	//TODO implement me
-	panic("implement me")
+	// Controllers do not support sub-components, always return empty slice
+	return []component.Component{}
 }
 
-func (s *SampledDataCtrlr) GetRequiredVariables() []variables.Variable {
-	//TODO implement me
-	panic("implement me")
+func (s *SampledDataCtrlr) GetRequiredVariables() []variables.VariableName {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.requiredVariables
 }
 
-func (s *SampledDataCtrlr) GetSupportedVariables() []variables.Variable {
-	//TODO implement me
-	panic("implement me")
+func (s *SampledDataCtrlr) GetSupportedVariables() []variables.VariableName {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.supportedVariables
 }
 
 func (s *SampledDataCtrlr) GetVariable(key variables.VariableName, opts ...component.GetSetVariableOption) (*variables.Variable, error) {
-	//TODO implement me
-	panic("implement me")
+	if !s.validator.IsVariableSupported(key) {
+		return nil, fmt.Errorf("variable %s is not supported", key)
+	}
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	variable, exists := s.variables[key]
+	if !exists {
+		return nil, fmt.Errorf("variable %s not found", key)
+	}
+
+	return variable, nil
 }
 
 func (s *SampledDataCtrlr) UpdateVariable(variable variables.VariableName, attribute string, value interface{}, opts ...component.GetSetVariableOption) error {
-	//TODO implement me
-	panic("implement me")
+	if !s.validator.IsVariableSupported(variable) {
+		return fmt.Errorf("variable %s is not supported", variable)
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	v, exists := s.variables[variable]
+	if !exists {
+		return fmt.Errorf("variable %s not found", variable)
+	}
+
+	return v.UpdateVariableAttribute(attribute, value)
 }
 
 func (s *SampledDataCtrlr) Validate(key variables.VariableName) bool {
-	//TODO implement me
-	panic("implement me")
+	if !s.validator.IsVariableSupported(key) {
+		return false
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	v, exists := s.variables[key]
+	if !exists {
+		return false
+	}
+
+	return v.Validate()
 }
 
 func NewSampledDataCtrlr() *SampledDataCtrlr {
-	return &SampledDataCtrlr{
-		variables:          make(map[variables.VariableName]variables.Variable),
+	ctrlr := &SampledDataCtrlr{
+		mu:                 sync.RWMutex{},
+		variables:          make(map[variables.VariableName]*variables.Variable),
 		requiredVariables:  requiredSampledDataVariables(),
 		supportedVariables: supportedSampledDataVariables(),
+		instanceId:         "sampled-data-ctrlr",
 	}
+
+	ctrlr.validator = newVariableValidator(ctrlr)
+
+	return ctrlr
 }

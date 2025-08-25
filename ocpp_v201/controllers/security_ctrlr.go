@@ -1,6 +1,9 @@
 package controllers
 
 import (
+	"fmt"
+	"sync"
+
 	"github.com/ChargePi/ocpp-manager/ocpp_v201/component"
 	"github.com/ChargePi/ocpp-manager/ocpp_v201/variables"
 )
@@ -19,8 +22,6 @@ const (
 
 func requiredSecurityVariables() []variables.VariableName {
 	return []variables.VariableName{
-		VariableNameOrganizationName,
-		VariableNameCertificateEntries,
 		VariableNameSecurityProfile,
 	}
 }
@@ -33,6 +34,8 @@ func optionalSecurityVariables() []variables.VariableName {
 		VariableNameCertSigningRepeatTimes,
 		VariableNameMaxCertificateChainSize,
 		VariableNameCertSigningWaitMinimum,
+		VariableNameCertificateEntries,
+		VariableNameOrganizationName,
 	}
 }
 
@@ -41,65 +44,107 @@ func supportedSecurityVariables() []variables.VariableName {
 }
 
 type SecurityCtrlr struct {
-	variables          map[variables.VariableName]variables.Variable
+	mu                 sync.RWMutex
+	variables          map[variables.VariableName]*variables.Variable
 	requiredVariables  []variables.VariableName
 	supportedVariables []variables.VariableName
+	instanceId         string
+	validator          *variableValidator
 }
 
-func (s *SecurityCtrlr) GetName() component.ComponentName {
-	//TODO implement me
-	panic("implement me")
+func (s *SecurityCtrlr) GetName() component.Name {
+	return component.ComponentNameSecurityCtrlr
 }
 
 func (s *SecurityCtrlr) GetInstanceId() string {
-	//TODO implement me
-	panic("implement me")
+	return s.instanceId
 }
 
 func (s *SecurityCtrlr) RegisterSubComponent(component component.Component) {
-	//TODO implement me
-	panic("implement me")
+	// No-op: controllers do not support sub-components
 }
 
 func (s *SecurityCtrlr) UnregisterSubComponent(component component.Component) {
-	//TODO implement me
-	panic("implement me")
+	// No-op: controllers do not support sub-components
 }
 
 func (s *SecurityCtrlr) GetSubComponents() []component.Component {
-	//TODO implement me
-	panic("implement me")
+	// Controllers do not support sub-components, always return empty slice
+	return []component.Component{}
 }
 
-func (s *SecurityCtrlr) GetRequiredVariables() []variables.Variable {
-	//TODO implement me
-	panic("implement me")
+func (s *SecurityCtrlr) GetRequiredVariables() []variables.VariableName {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.requiredVariables
 }
 
-func (s *SecurityCtrlr) GetSupportedVariables() []variables.Variable {
-	//TODO implement me
-	panic("implement me")
+func (s *SecurityCtrlr) GetSupportedVariables() []variables.VariableName {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.supportedVariables
 }
 
 func (s *SecurityCtrlr) GetVariable(key variables.VariableName, opts ...component.GetSetVariableOption) (*variables.Variable, error) {
-	//TODO implement me
-	panic("implement me")
+	if !s.validator.IsVariableSupported(key) {
+		return nil, fmt.Errorf("variable %s is not supported", key)
+	}
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	variable, exists := s.variables[key]
+	if !exists {
+		return nil, fmt.Errorf("variable %s not found", key)
+	}
+
+	return variable, nil
 }
 
 func (s *SecurityCtrlr) UpdateVariable(variable variables.VariableName, attribute string, value interface{}, opts ...component.GetSetVariableOption) error {
-	//TODO implement me
-	panic("implement me")
+	if !s.validator.IsVariableSupported(variable) {
+		return fmt.Errorf("variable %s is not supported", variable)
+	}
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	v, exists := s.variables[variable]
+	if !exists {
+		return fmt.Errorf("variable %s not found", variable)
+	}
+
+	return v.UpdateVariableAttribute(attribute, value)
 }
 
 func (s *SecurityCtrlr) Validate(key variables.VariableName) bool {
-	//TODO implement me
-	panic("implement me")
+	if !s.validator.IsVariableSupported(key) {
+		return false
+	}
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	v, exists := s.variables[key]
+	if !exists {
+		return false
+	}
+
+	return v.Validate()
 }
 
 func NewSecurityCtrlr() *SecurityCtrlr {
-	return &SecurityCtrlr{
-		variables:          make(map[variables.VariableName]variables.Variable),
+	ctrlr := &SecurityCtrlr{
+		mu:                 sync.RWMutex{},
+		variables:          make(map[variables.VariableName]*variables.Variable),
 		requiredVariables:  requiredSecurityVariables(),
 		supportedVariables: supportedSecurityVariables(),
+		instanceId:         "security-ctrlr",
 	}
+
+	ctrlr.validator = newVariableValidator(ctrlr)
+
+	return ctrlr
 }

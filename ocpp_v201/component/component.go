@@ -3,49 +3,60 @@ package component
 import "github.com/ChargePi/ocpp-manager/ocpp_v201/variables"
 
 type Component interface {
-	// Essentially a component type.
-	GetName() ComponentName
-	// Instance ID where a component can be addressed
+
+	// GetName Essentially a component type.
+	GetName() Name
+
+	// GetInstanceId returns the unique instance ID of this component.
 	GetInstanceId() string
+
 	// RegisterSubComponent registers a sub-component to this component.
 	RegisterSubComponent(component Component)
+
 	// UnregisterSubComponent unregisters a sub-component from this component.
 	UnregisterSubComponent(component Component)
+
 	// GetSubComponents returns all sub-components of this component.
 	GetSubComponents() []Component
 
-	// Required variables for this component
-	GetRequiredVariables() []variables.Variable
-	// Suported variables for this component
-	GetSupportedVariables() []variables.Variable
+	// GetRequiredVariables returns required variables for this component
+	GetRequiredVariables() []variables.VariableName
 
+	// GetSupportedVariables returns supported variables (both required and optional) for this component
+	GetSupportedVariables() []variables.VariableName
+
+	// GetVariable retrieves a variable by its name.
 	GetVariable(key variables.VariableName, opts ...GetSetVariableOption) (*variables.Variable, error)
+
+	// UpdateVariable updates a variable's attribute with a new value.
 	UpdateVariable(variable variables.VariableName, attribute string, value interface{}, opts ...GetSetVariableOption) error
+
+	// Validate checks if the variable is valid for this component.
 	Validate(key variables.VariableName) bool
 }
 
-type ComponentName string
+type Name string
 
 const (
-	ComponentNameOCPPCommCtrlr       ComponentName = "OCPPCommCtrlr"
-	ComponentNameLocalAuthListCtrlr  ComponentName = "LocalAuthListCtrlr"
-	ComponentNameTxCtrlr             ComponentName = "TxCtrlr"
-	ComponentNameDeviceDataCtrlr     ComponentName = "DeviceDataCtrlr"
-	ComponentNameSecurityCtrlr       ComponentName = "SecurityCtrlr"
-	ComponentNameClockCtrlr          ComponentName = "ClockCtrlr"
-	ComponentNameCustomizationCtrlr  ComponentName = "CustomizationCtrlr"
-	ComponentNameSampledDataCtrlr    ComponentName = "SampledDataCtrlr"
-	ComponentNameAlignedDataCtrlr    ComponentName = "AlignedDataCtrlr"
-	ComponentNameReservationCtrlr    ComponentName = "ReservationCtrlr"
-	ComponentNameSmartChargingCtrlr  ComponentName = "SmartChargingCtrlr"
-	ComponentNameTariffCostCtrlr     ComponentName = "TariffCostCtrlr"
-	ComponentNameMonitoringCtrlr     ComponentName = "MonitoringCtrlr"
-	ComponentNameDisplayMessageCtrlr ComponentName = "DisplayMessageCtrlr"
-	ComponentNameISO15118Ctrlr       ComponentName = "ISO15118Ctrlr"
-	ComponentNameAuthCtrlr           ComponentName = "AuthCtrlr"
-	ComponentNameAuthCacheCtrlr      ComponentName = "AuthCacheCtrlr"
-	ComponentNameChargingStation     ComponentName = "ChargingStation"
-	ComponentNameEVSE                ComponentName = "EVSE"
-	ComponentNameConnector           ComponentName = "Connector"
-	ComponentNameConnectedEV         ComponentName = "ConnectedEV"
+	ComponentNameOCPPCommCtrlr       Name = "OCPPCommCtrlr"
+	ComponentNameLocalAuthListCtrlr  Name = "LocalAuthListCtrlr"
+	ComponentNameTxCtrlr             Name = "TxCtrlr"
+	ComponentNameDeviceDataCtrlr     Name = "DeviceDataCtrlr"
+	ComponentNameSecurityCtrlr       Name = "SecurityCtrlr"
+	ComponentNameClockCtrlr          Name = "ClockCtrlr"
+	ComponentNameCustomizationCtrlr  Name = "CustomizationCtrlr"
+	ComponentNameSampledDataCtrlr    Name = "SampledDataCtrlr"
+	ComponentNameAlignedDataCtrlr    Name = "AlignedDataCtrlr"
+	ComponentNameReservationCtrlr    Name = "ReservationCtrlr"
+	ComponentNameSmartChargingCtrlr  Name = "SmartChargingCtrlr"
+	ComponentNameTariffCostCtrlr     Name = "TariffCostCtrlr"
+	ComponentNameMonitoringCtrlr     Name = "MonitoringCtrlr"
+	ComponentNameDisplayMessageCtrlr Name = "DisplayMessageCtrlr"
+	ComponentNameISO15118Ctrlr       Name = "ISO15118Ctrlr"
+	ComponentNameAuthCtrlr           Name = "AuthCtrlr"
+	ComponentNameAuthCacheCtrlr      Name = "AuthCacheCtrlr"
+	ComponentNameChargingStation     Name = "ChargingStation"
+	ComponentNameEVSE                Name = "EVSE"
+	ComponentNameConnector           Name = "Connector"
+	ComponentNameConnectedEV         Name = "ConnectedEV"
 )
