@@ -85,6 +85,15 @@ func (v *Variable) GetVariableAttribute(attribute string) (*VariableAttributes, 
 	return &existingEntry, nil
 }
 
+// GetAllAttributes returns a copy of all attributes for this variable.
+func (v *Variable) GetAllAttributes() map[string]VariableAttributes {
+	result := make(map[string]VariableAttributes, len(v.attributes))
+	for k, vAttr := range v.attributes {
+		result[k] = vAttr
+	}
+	return result
+}
+
 type VariableAttributes struct {
 	Type       VariableType
 	Mutability Mutability
@@ -133,6 +142,7 @@ func (va *VariableAttributes) copy() VariableAttributes {
 
 // Update updates the variable attribute value
 func (va *VariableAttributes) Update(value interface{}) error {
+	// Make a copy of the variable attributes to validate the new value
 	attrsCopy := va.copy()
 	attrsCopy.Value = value
 	if !attrsCopy.Validate() {
@@ -149,4 +159,12 @@ type VariableCharacteristic struct {
 	MinLimit   *int
 	Unit       *string
 	ValuesList []string
+}
+
+// NewVariable creates a new variable with the given name, type, and default value
+func NewVariable(name VariableName, varType VariableType) *Variable {
+	return &Variable{
+		Name:       name,
+		attributes: map[string]VariableAttributes{},
+	}
 }
