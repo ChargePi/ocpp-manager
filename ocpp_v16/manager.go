@@ -29,11 +29,13 @@ type (
 	}
 
 	ManagerV16 struct {
-		ocppConfig       *Config
-		mandatoryKeys    []Key
-		keyValidator     KeyValidator
+		ocppConfig Config
+		mu         sync.RWMutex
+
+		mandatoryKeys []Key
+		keyValidator  KeyValidator
+
 		onUpdateHandlers map[Key]OnUpdateHandler
-		mu               sync.Mutex
 	}
 )
 
@@ -47,10 +49,9 @@ func NewV16ConfigurationManager(defaultConfiguration Config, profiles ...string)
 	}
 
 	return &ManagerV16{
-		ocppConfig:       &defaultConfiguration,
+		ocppConfig:       defaultConfiguration,
 		mandatoryKeys:    mandatoryKeys,
 		onUpdateHandlers: make(map[Key]OnUpdateHandler),
-		mu:               sync.Mutex{},
 	}, nil
 }
 
@@ -65,17 +66,23 @@ func (m *ManagerV16) SetConfiguration(configuration Config) error {
 		return err
 	}
 
-	m.ocppConfig = &configuration
+	m.ocppConfig = configuration
 	return nil
 }
 
 // RegisterCustomKeyValidator registers a custom key validator
 func (m *ManagerV16) RegisterCustomKeyValidator(validator KeyValidator) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.keyValidator = validator
 }
 
 // GetMandatoryKeys returns the mandatory keys for the configuration
 func (m *ManagerV16) GetMandatoryKeys() []Key {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
 	return m.mandatoryKeys
 }
 
@@ -132,16 +139,16 @@ func (m *ManagerV16) UpdateKey(key Key, value *string) error {
 
 // GetConfiguration returns the full current configuration
 func (m *ManagerV16) GetConfiguration() ([]core.ConfigurationKey, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 
 	return m.ocppConfig.GetConfig(), nil
 }
 
 // GetConfigurationValue returns the value of a specific key
 func (m *ManagerV16) GetConfigurationValue(key Key) (*string, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 
 	return m.ocppConfig.GetConfigurationValue(key.String())
 }
@@ -165,6 +172,9 @@ func (m *ManagerV16) OnUpdateKey(key Key, handler OnUpdateHandler) error {
 	if stringUtils.IsEmpty(key.String()) {
 		return ErrKeyCannotBeEmpty
 	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	// Validate that the key exists
 	_, err := m.ocppConfig.GetConfigurationValue(key.String())
