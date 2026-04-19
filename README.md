@@ -9,6 +9,7 @@ getting and setting values, validating values, and enforcing mandatory keys.
 - Mandatory key enforcement
 - Custom value validation
 - Provides sane default values
+- Supports OCPP 1.6 and 2.0.1 (separate packages for each version)
 
 ## Roadmap
 
@@ -16,7 +17,7 @@ getting and setting values, validating values, and enforcing mandatory keys.
 - [x] Custom value validation
 - [x] Mandatory key enforcement
 - [x] Support for OCPP 1.6
-- [ ] Support for OCPP 2.0.1
+- [x] Support for OCPP 2.0.1
 
 ## Installing
 
@@ -25,6 +26,8 @@ getting and setting values, validating values, and enforcing mandatory keys.
 ```
 
 ## ⚡ Usage
+
+### OCPP 1.6
 
 Check out the full [OCPP 1.6 example](examples/v16/example.go).
 
@@ -91,6 +94,10 @@ func main() {
 }
 
 ```
+
+### OCPP 2.0.1 
+
+TBD
 
 ## Notes
 
