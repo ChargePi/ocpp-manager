@@ -95,8 +95,7 @@ func (s *OcppConfigTest) TestSetVersion() {
 
 func (s *OcppConfigTest) TestUpdateKey() {
 	// Ok case
-	newVal := "1234"
-	err := s.config.UpdateKey("HeartbeatInterval", &newVal)
+	err := s.config.UpdateKey("HeartbeatInterval", new("1234"))
 	s.Assert().NoError(err)
 	value, err := s.config.GetConfigurationValue("HeartbeatInterval")
 	s.Require().NoError(err)
