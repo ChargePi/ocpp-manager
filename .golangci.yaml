@@ -1,0 +1,39 @@
+version: "2"
+linters:
+  default: all
+  enable:
+    - bodyclose
+    - copyloopvar
+    - decorder
+    - errcheck
+    - errname
+    - forbidigo
+    - goconst
+    - gocritic
+    - gosec
+    - govet
+    - ineffassign
+    - intrange
+    - misspell
+    - nestif
+    - predeclared
+    - staticcheck
+    - testifylint
+    - unparam
+    - unused
+    - wastedassign
+    - whitespace
+    - wrapcheck
+  exclusions:
+    generated: lax
+    paths:
+      - ./examples
+
+formatters:
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/ChargePi/ocpp-manager
+  enable:
+    - gofmt
+    - goimports
